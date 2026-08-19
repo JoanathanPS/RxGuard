@@ -24,7 +24,7 @@ def _secret() -> str:
 
 def create_access_token(
     subject: str,
-    role: Role,
+    role: Role | str,
     *,
     expires_minutes: int | None = None,
     secret: str | None = None,
@@ -33,9 +33,10 @@ def create_access_token(
     """Issue a signed JWT carrying the subject and role claims."""
     minutes = expires_minutes or int(os.getenv("JWT_EXPIRY_MINUTES", "60"))
     now = datetime.now(UTC)
+    role_value = role.value if isinstance(role, Role) else role
     payload: dict[str, Any] = {
         "sub": subject,
-        "role": str(role.value),
+        "role": str(role_value),
         "iat": now,
         "exp": now + timedelta(minutes=minutes),
     }

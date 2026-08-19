@@ -23,19 +23,20 @@ if (-not (Test-Path -LiteralPath $pyexe)) {
     throw "venv not found — run .\scripts\bootstrap.ps1 first"
 }
 
-$port = (Get-Content -LiteralPath (Join-Path $serviceDir "app\core\config.py") | Select-String "service_name: str" | Out-Null; 0)
-# Port comes from the service's pyproject description comment; fall back to 8000.
-$portLine = Get-Content -LiteralPath (Join-Path $serviceDir "pyproject.toml") -ErrorAction SilentlyContinue
 $port = 8000
 if (Test-Path -LiteralPath (Join-Path $serviceDir "Dockerfile")) {
     $expose = (Get-Content -LiteralPath (Join-Path $serviceDir "Dockerfile") | Where-Object { $_ -match "^EXPOSE" })
     if ($expose) { $port = ($expose -replace "\D", "") }
 }
 
+# Package name mirrors the service name, e.g. user-service -> user_app.
+$svcName = $Service -replace "-service$", ""
+$module = "$svcName`_app.main:app"
+
 Write-Host "Starting $Service on http://localhost:$port  (Ctrl+C to stop)"
 Push-Location $serviceDir
 try {
-    & $pyexe -m uvicorn app.main:app --host 0.0.0.0 --port $port --reload
+    & $pyexe -m uvicorn $module --host 0.0.0.0 --port $port --reload
 }
 finally {
     Pop-Location

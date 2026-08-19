@@ -25,7 +25,7 @@
 | Phase | State |
 |---|---|
 | 0 — Scaffolding | ✅ done (see below) |
-| 1 — Core vertical slice | ⏳ next |
+| 1 — Core vertical slice | ✅ done (see below) |
 | 2 — AI integration | — |
 | 3 — Alerts & audit | — |
 | 4 — Comparative evaluation | — |
@@ -51,6 +51,40 @@
   the ground truth for the Phase 4 benchmark.
 - `infra/docker-compose.yml` currently brings up only Postgres + Redis; services
   are added per phase.
+
+## Phase 1 — as-built
+
+The core vertical slice: create a patient → write a multi-drug prescription →
+run the rule-based interaction check → view results.
+
+- **user-service**: registration, login (bcrypt + JWT), `/users/me`, admin-gated
+  `/users` list, RBAC dependencies, Alembic migration `0001`, admin seed
+  (`app/seed.py`, idempotent). 9 tests.
+- **patient-service**: full addendum profile — `patients` (weight/height/
+  pregnancy/breastfeeding) plus `patient_conditions`, `patient_allergies`,
+  `patient_labs`, `patient_lifestyle` sub-resources; CRUD + nested routes,
+  migration `0001`. 8 tests.
+- **prescription-service**: `prescriptions`/`prescription_items`; duplicate-drug
+  rejection, per-item route validation against a `ROUTES` enum, RXCUI
+  standardization through the shared drug catalog; `GET /drugs/search` against
+  the local catalog; migration `0001`. 11 tests.
+- **interaction-service**: `POST /interactions/check` — full N-ary pair
+  generation (`C(drugs, 2)`), severity lookup against
+  `data/interactions_seed.csv` (confidence 1.0 in-dataset / 0.5 otherwise,
+  severity falls back to `safe`), result persistence to `interaction_results`,
+  detection-time measurement; `POST /interactions/check-manual` returns 501
+  (manual engine lands in Phase 4 and stays deliberately independent). 10 tests.
+- **frontend** (`frontend/`): Vite + React + TS + Tailwind + TanStack Query.
+  Login, patient list/create, prescription entry with live drug autocomplete,
+  and an interaction-results view with severity badges. Talks to each service
+  directly on its dev port (CORS allows the Vite origin); `VITE_*_API` env vars
+  in `frontend/.env.example`. Vitest smoke tests for routing/guard.
+- **Data layer**: `infra/docker-compose.yml` now wires Postgres + Redis + the
+  four services (each applies its own Alembic migration on startup). Postgres
+  schemas per service (`user_svc`, `patient_svc`, `prescription_svc`,
+  `interaction_svc`) via `search_path` in the engine URL.
+- **Engine parity with tests**: 50 backend tests green (root `pytest -q`),
+  ruff clean, frontend `npm run build` + `npm run test` green.
 
 ## Addendum: Patient Profile Intake & Drug-Patient Safety module
 
@@ -99,6 +133,20 @@ Recorded here with rationale, per spec §14. New entries are added each phase.
 4. **RXCUI values in `data/drug_mapping.csv`** are from memory/community sources
    and must be verified against the live RxNorm API during Phase 2 before being
    treated as authoritative for the demo.
+5. **Each service's Python package was renamed `app` → `<service>_app`**
+   (e.g. `user_app`). The Phase 0 template gave every service the same top-level
+   package name `app`; once services grew real modules (db/config/models) the
+   names collided in any single process — a root `pytest shared services` run
+   failed and even a shared dev venv resolved `app` to an arbitrary service.
+   Unique package names make all services importable side-by-side (tests, CI,
+   future cross-service tooling) with no runtime cost.
+6. **`interaction_results.prescription_id` is a logical reference, not a FK** —
+   no cross-schema foreign key to `prescription_svc.prescriptions` (each service
+   owns its schema; a separate-DB deployment would make such a FK impossible).
+   It is an indexed integer, validated at the API layer.
+7. **Rule data lives in the container image** at `/app/data` and the shared
+   loader resolves it via `$RXGUARD_DATA_DIR` → CWD-parent walk → package-parent
+   walk, so engine code is identical in host dev, tests, and Docker.
 
 ## Design decisions worth defending
 

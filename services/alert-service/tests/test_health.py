@@ -2,7 +2,7 @@
 
 from fastapi.testclient import TestClient
 
-from app.main import app
+from alert_app.main import app
 
 client = TestClient(app)
 

@@ -9,7 +9,7 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
-from app.core.config import get_settings
+from analytics_app.core.config import get_settings
 
 config = context.config
 
@@ -19,7 +19,7 @@ if config.config_file_name is not None:
 config.set_main_option("sqlalchemy.url", get_settings().database_url)
 
 # Phase 1: attach SQLAlchemy model metadata here for `alembic revision
-# --autogenerate`, e.g. `from app import models; target_metadata = models.Base.metadata`.
+# --autogenerate`, e.g. `from analytics_app import models; target_metadata = models.Base.metadata`.
 target_metadata = None
 
 

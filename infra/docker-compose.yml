@@ -1,8 +1,9 @@
 # RxGuard local dev stack.
 #
-# Phase 0 skeleton: data layer only (PostgreSQL + Redis).
-# Services are added to this file as their phases land — Phase 1 brings up the
-# first microservices, Phase 5 adds the Traefik gateway.
+# Phase 1: data layer + the four core microservices (user, patient,
+# prescription, interaction). Each service applies its own Alembic migrations
+# on startup and exposes a host port for direct access in dev (the Traefik
+# gateway arrives in Phase 5).
 name: rxguard
 
 services:
@@ -35,6 +36,79 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  user-service:
+    build:
+      context: ..
+      dockerfile: services/user-service/Dockerfile
+    container_name: rxguard-user-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://rxguard:rxguard@postgres:5432/rxguard
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-long-random-string}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@rxguard.dev}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin12345}
+    ports:
+      - "8001:8001"
+    command: >
+      sh -c "alembic upgrade head &&
+             python -m app.seed &&
+             uvicorn user_app.main:app --host 0.0.0.0 --port 8001"
+
+  patient-service:
+    build:
+      context: ..
+      dockerfile: services/patient-service/Dockerfile
+    container_name: rxguard-patient-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://rxguard:rxguard@postgres:5432/rxguard
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-long-random-string}
+    ports:
+      - "8002:8002"
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn patient_app.main:app --host 0.0.0.0 --port 8002"
+
+  prescription-service:
+    build:
+      context: ..
+      dockerfile: services/prescription-service/Dockerfile
+    container_name: rxguard-prescription-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://rxguard:rxguard@postgres:5432/rxguard
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-long-random-string}
+    ports:
+      - "8003:8003"
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn prescription_app.main:app --host 0.0.0.0 --port 8003"
+
+  interaction-service:
+    build:
+      context: ..
+      dockerfile: services/interaction-service/Dockerfile
+    container_name: rxguard-interaction-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://rxguard:rxguard@postgres:5432/rxguard
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-long-random-string}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.3-70b-versatile}
+    ports:
+      - "8004:8004"
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn interaction_app.main:app --host 0.0.0.0 --port 8004"
 
 volumes:
   postgres_data:

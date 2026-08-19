@@ -1,26 +1,28 @@
 """Alembic migration environment for user-service.
 
-The `sqlalchemy.url` is injected from app settings so a single config works
-for host-local dev, Docker Compose, and Kubernetes without editing files.
+The `sqlalchemy.url` is injected from app settings (with the service schema's
+search_path) so a single config works for host-local dev, Docker Compose, and
+Kubernetes without editing files.
 """
 
 from logging.config import fileConfig
 
+from rxguard_shared.db import Base, build_engine_url
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
-from app.core.config import get_settings
+from user_app import models  # noqa: F401
+from user_app.core.config import get_settings
 
 config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+settings = get_settings()
+config.set_main_option("sqlalchemy.url", build_engine_url(settings.database_url, settings.schema_name))
 
-# Phase 1: attach SQLAlchemy model metadata here for `alembic revision
-# --autogenerate`, e.g. `from app import models; target_metadata = models.Base.metadata`.
-target_metadata = None
+target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:

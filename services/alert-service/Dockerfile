@@ -1,4 +1,4 @@
-# Build context is the repo root (see infra/docker-compose.yml).
+﻿# Build context is the repo root (see infra/docker-compose.yml).
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -7,6 +7,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # Shared package first so service imports resolve at install/run time.
+COPY data /app/data
 COPY shared /app/shared
 RUN pip install --no-cache-dir /app/shared
 
@@ -17,5 +18,5 @@ RUN pip install --no-cache-dir .
 
 EXPOSE 8005
 
-# Alembic migrations are applied by the compose entrypoint in later phases.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8005"]
+# Alembic migrations are applied by the compose entrypoint.
+CMD ["uvicorn", "alert_app.main:app", "--host", "0.0.0.0", "--port", "8005"]

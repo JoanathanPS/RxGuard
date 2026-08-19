@@ -1,0 +1,34 @@
+drug_name,rxcui,drug_class,mechanism_flag,risk_factor_flag
+warfarin,11289,anticoagulant,1,1
+aspirin,1191,nsaid_antiplatelet,1,1
+ibuprofen,5640,nsaid,1,1
+acetaminophen,161,analgesic,0,0
+amoxicillin,723,penicillin_antibiotic,0,0
+clarithromycin,2670,macrolide,1,1
+fluconazole,4440,azole_antifungal,1,1
+simvastatin,36567,statin,1,1
+gemfibrozil,24987,fibrate,1,1
+digoxin,3640,cardiac_glycoside,1,1
+amiodarone,703,antiarrhythmic,1,1
+verapamil,11170,calcium_channel_blocker,1,1
+methotrexate,6851,antimetabolite,1,1
+trimethoprim,10622,antibiotic,1,1
+fluoxetine,4493,ssri,1,1
+phenelzine,8134,maoi,1,1
+sertraline,9617,ssri,1,1
+tramadol,10871,opioid_analgesic,1,1
+sildenafil,36437,pde5_inhibitor,1,1
+nitroglycerin,3837,nitrate,1,1
+lisinopril,29046,ace_inhibitor,0,1
+spironolactone,10106,potassium_sparing_diuretic,0,1
+lithium,6518,mood_stabilizer,1,1
+clopidogrel,32968,antiplatelet,1,1
+omeprazole,7646,proton_pump_inhibitor,1,0
+valproic acid,11148,anticonvulsant,1,1
+carbamazepine,2000,anticonvulsant,1,1
+levothyroxine,10582,thyroid_hormone,1,1
+calcium carbonate,2061,antacid_supplement,0,0
+theophylline,10550,bronchodilator,1,1
+ciprofloxacin,2551,fluoroquinolone,1,1
+cetirizine,21000,antihistamine,0,0
+metformin,6809,biguanide,0,0

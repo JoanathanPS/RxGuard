@@ -1,0 +1,41 @@
+# RxGuard local dev stack.
+#
+# Phase 0 skeleton: data layer only (PostgreSQL + Redis).
+# Services are added to this file as their phases land — Phase 1 brings up the
+# first microservices, Phase 5 adds the Traefik gateway.
+name: rxguard
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: rxguard-postgres
+    environment:
+      POSTGRES_USER: rxguard
+      POSTGRES_PASSWORD: rxguard
+      POSTGRES_DB: rxguard
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rxguard -d rxguard"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: rxguard-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres_data:
+  redis_data:

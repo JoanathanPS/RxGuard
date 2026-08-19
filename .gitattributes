@@ -1,0 +1,14 @@
+# Normalize line endings across Windows dev machines and Linux CI/Docker.
+* text=auto
+
+# Explicitly LF for these, even on Windows checkout.
+*.py text eol=lf
+*.toml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf
+*.md text eol=lf
+*.csv text eol=lf
+Dockerfile text eol=lf
+*.ps1 text eol=crlf
+*.bat text eol=crlf

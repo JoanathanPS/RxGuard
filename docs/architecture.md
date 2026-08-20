@@ -27,7 +27,7 @@
 | Phase | State |
 |---|---|
 | 0 — Supabase cloud + migration + archive | ✅ done (below) |
-| 1 — Next.js frontend rebuild | — |
+| 1 — Next.js frontend rebuild | ✅ done (below) |
 | 2 — Adaptive interview (`interview-turn` Edge Function) | — |
 | 3 — Final assessment (`final-assessment` Edge Function) | — |
 | 4 — Comparative evaluation (AI vs manual baseline) | — |
@@ -62,7 +62,7 @@
    (the comparative evaluation is LLM-vs-manual baseline per `prompt.md` —
    a classifier is not required by the spec and would muddy the research
    comparison), Redis (Supabase provides none; not needed at this scale).
-5. **Frontend rebuilt as Next.js 15 (App Router) + TypeScript + Tailwind v4 +
+5. **Frontend rebuilt as Next.js (App Router) + TypeScript + Tailwind v4 +
    Motion + supabase-js** in `web/`, replacing the archived Vite app. Brand per
    `DESIGN.md`; font substituted Berkeley Mono → **JetBrains Mono** (Berkeley
    Mono is a paid font; JetBrains Mono is metrically close and free).
@@ -76,6 +76,45 @@
    because the build network blocks outbound Postgres ports (5432/6543) while
    HTTPS works. The CLI's `supabase_migrations.schema_migrations` table is
    maintained by hand so `supabase migration list`/`db push` stay consistent.
+
+## Phase 1 — as-built (current stack)
+
+The frontend rebuild in `web/` (Next.js 16 App Router + TypeScript + Tailwind v4 +
+Motion + `@supabase/ssr`), generated from the start against `DESIGN.md` and the
+installed taste-skill conventions (dials VARIANCE 4 / MOTION 3 / DENSITY 5 for a
+trust-first regulated product).
+
+- **Design system**: cream canvas `#fdfcfc` / ink `#201d1d` / accent `#007aff` /
+  warning `#ff9f0a` / danger `#ff3b30` / success `#30d158`, hairline borders,
+  4px radius, single monospace family. **JetBrains Mono is bundled locally**
+  (`web/fonts/`, variable font via `next/font/local`) so the build never depends
+  on a font CDN. Light-only theme: `DESIGN.md` defines one cream canvas as the
+  brand, which the skill's dark-mode rule allows ("unless the brand insists on
+  one mode").
+- **Auth**: email+password sign-in/sign-up on `/login`. The cloud project has
+  `mailer_autoconfirm: true` (set via Management API) so demo signups get an
+  immediate session. `handle_new_user` trigger auto-creates the `profiles` row
+  with role `clinician`.
+- **Route guard**: Next.js 16 renamed middleware → `proxy.ts`; it refreshes the
+  session cookie and 307s unauthenticated users to `/login` (verified live).
+- **Pages**: `/patients` (server-rendered list, RLS-filtered), `/patients/new`
+  (intake form — age/gender/weight/height/pregnancy/breastfeeding with
+  "not known" defaults, matching the addendum's unknown-tolerant intake),
+  `/patients/[id]` (profile + prescription history), `/prescriptions/new`
+  (multi-drug entry with live autocomplete against `drug_mapping` — RXCUI is
+  resolved on save, free-text drugs are allowed and flagged), `/prescriptions/[id]`
+  (summary + Phase 2 interview placeholder).
+- **Data access**: server components query through the cookie-based Supabase
+  client so RLS runs with the user's JWT; mutations go through the browser
+  client. No server-side service role anywhere in the app.
+- **Verified live (smoke test, data since cleaned)**: signup → trigger →
+  profile; password login; anonymous 307 to `/login`; authenticated SSR of
+  `/patients` renders the user's rows; second user sees 0 rows (RLS isolation);
+  prescription + items (Warfarin/Aspirin with RXCUIs) created and read back
+  through RLS; `/prescriptions/[id]` renders 200.
+- **Note**: deleting a user via the Auth Admin API returns 500 when the user
+  owns rows (the cascade hits RLS). User removal is done with the Management
+  API (postgres role bypasses RLS) — an operational note, not an app path.
 
 ---
 

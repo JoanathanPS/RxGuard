@@ -128,12 +128,21 @@ export async function POST(req: Request) {
   }
 
   const svc = createAdminClient();
-  const { data: cases, error: casesErr } = await svc
+  const { data: allCases, error: casesErr } = await svc
     .from("benchmark_cases")
     .select("*")
     .order("id", { ascending: true });
   if (casesErr) return NextResponse.json({ error: casesErr.message }, { status: 500 });
-  const list = cases as BenchmarkCase[];
+  let cases = allCases as BenchmarkCase[];
+  const only = new URL(req.url)
+    .searchParams.get("cases")
+    ?.split(",")
+    .map((s) => Number(s.trim()))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  if (only?.length) {
+    cases = cases.filter((c) => only.includes(c.id));
+  }
+  const list = cases;
 
   const outcomes: Record<string, CaseOutcome[]> = {};
   const times: Record<string, number[]> = {};

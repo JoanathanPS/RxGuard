@@ -54,7 +54,7 @@ services:
       - "8001:8001"
     command: >
       sh -c "alembic upgrade head &&
-             python -m app.seed &&
+             python -m user_app.seed &&
              uvicorn user_app.main:app --host 0.0.0.0 --port 8001"
 
   patient-service:

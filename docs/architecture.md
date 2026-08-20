@@ -147,6 +147,10 @@ Recorded here with rationale, per spec §14. New entries are added each phase.
 7. **Rule data lives in the container image** at `/app/data` and the shared
    loader resolves it via `$RXGUARD_DATA_DIR` → CWD-parent walk → package-parent
    walk, so engine code is identical in host dev, tests, and Docker.
+8. **Alembic `env.py` is self-sufficient at runtime**: it escapes `%` in the
+   engine URL (configparser interpolation) and pre-creates the service schema
+   before migrating, because Alembic writes its `alembic_version` table *before*
+   any migration (and thus before the schema from migration `0001`) exists.
 
 ## Design decisions worth defending
 

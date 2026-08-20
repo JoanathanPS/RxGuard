@@ -3,7 +3,7 @@
 from logging.config import fileConfig
 
 from rxguard_shared.db import Base, build_engine_url
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import engine_from_config, pool, text
 
 from alembic import context
 from patient_app import models  # noqa: F401
@@ -15,7 +15,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 settings = get_settings()
-config.set_main_option("sqlalchemy.url", build_engine_url(settings.database_url, settings.schema_name))
+config.set_main_option("sqlalchemy.url", build_engine_url(settings.database_url, settings.schema_name).replace("%", "%%"))
 
 target_metadata = Base.metadata
 
@@ -39,6 +39,8 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
+        connection.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{settings.schema_name}"'))
+        connection.commit()
         context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():
             context.run_migrations()

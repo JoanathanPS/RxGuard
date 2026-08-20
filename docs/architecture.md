@@ -12,7 +12,9 @@
 - **Course**: CSA1016 Software Engineering Capstone — SIMATS Engineering (Biotechnology).
 - **Team**: Joanathan Packia Singh, Akileshwaran A, Dilli Babu N, Pilli Varshini.
 - **Supervisor**: Dr. K. Anita Davamani.
-- **Source of truth**: `prompt.md` (Review 2 build specification).
+- **Source of truth**: `prompt.md` (Review 2 build specification) for domain
+  behavior; `plan.md` is the current build plan (it supersedes the infra
+  direction in `prompt.md` — see the pivot below).
 - **Research question**: does AI assistance improve efficiency and consistency of
   drug-interaction checking over manual verification?
 
@@ -20,20 +22,68 @@
 > certified medical device. Output is decision *support* only and must never
 > replace a qualified clinician or an authoritative reference.
 
-## Status
+## Status (current plan — see plan.md phases)
 
 | Phase | State |
 |---|---|
-| 0 — Scaffolding | ✅ done (see below) |
-| 1 — Core vertical slice | ✅ done (see below) |
-| 2 — AI integration | — |
-| 3 — Alerts & audit | — |
-| 4 — Comparative evaluation | — |
-| 5 — Gateway & service wiring | — |
-| 6 — DevOps & monitoring | — |
-| 7 — Polish & report artifacts | — |
+| 0 — Supabase cloud + migration + archive | ✅ done (below) |
+| 1 — Next.js frontend rebuild | — |
+| 2 — Adaptive interview (`interview-turn` Edge Function) | — |
+| 3 — Final assessment (`final-assessment` Edge Function) | — |
+| 4 — Comparative evaluation (AI vs manual baseline) | — |
+| 5 — Audit, RBAC polish, docs, report artifacts | — |
 
-## Phase 0 — as-built
+## Pivot: managed Supabase + Next.js + Groq (deviation from Review 2 stack)
+
+> Decision recorded 2026-08-20. The original self-hosted microservice stack below
+> (7 FastAPI services + Vite + Docker Compose/K8s + ELK) was **archived to
+> `_archive/`** and replaced per `plan.md`. This is the single largest deviation
+> from the Review 2 deck and is defended as follows in the viva:
+
+1. **Microservices were over-engineering at this scale.** A 4-person capstone
+   with a focused vertical slice (patient → prescription → interview → assessment)
+   pays deployment and consistency costs (7 services × migrations × schemas,
+   cross-schema FKs, gateway, service discovery) without proportional benefit.
+   A managed platform collapses this to one Postgres schema + RLS + serverless
+   functions, and lets the team spend its effort on the research question the
+   project is actually graded on: AI-vs-manual comparative evaluation.
+2. **Supabase gives the audit/security story out of the box**: managed Auth
+   (email + password, JWT), Row Level Security per role (clinician /
+   pharmacist / researcher / admin — same roles as the original design),
+   append-only `audit_log` via RLS (no UPDATE/DELETE grants), and point-in-time
+   backup. These were hand-rolled (or planned) in the old stack; here they are
+   platform-enforced, which is the stronger answer to the compliance-style
+   requirements in the deck.
+3. **Edge Functions (Deno) run the AI flows server-side** — the Groq API key
+   never reaches the browser, and RLS stays the single data-access gate.
+4. **Dropped infrastructure** (with one-line rationale): Kubernetes/ELK (no
+   scale need; Supabase handles ops), ClickHouse (kept Postgres for analytics
+   tables, same rationale as deviation #2 below), scikit-learn classifier
+   (the comparative evaluation is LLM-vs-manual baseline per `prompt.md` —
+   a classifier is not required by the spec and would muddy the research
+   comparison), Redis (Supabase provides none; not needed at this scale).
+5. **Frontend rebuilt as Next.js 15 (App Router) + TypeScript + Tailwind v4 +
+   Motion + supabase-js** in `web/`, replacing the archived Vite app. Brand per
+   `DESIGN.md`; font substituted Berkeley Mono → **JetBrains Mono** (Berkeley
+   Mono is a paid font; JetBrains Mono is metrically close and free).
+6. **Data model lives in `supabase/migrations/`** (Postgres, applied via
+   `supabase db push` / Management API). `data/*.csv` remains the single source
+   of truth for rule data — `supabase/scripts/csv-to-seed.ps1` regenerates
+   `0002_seed_data.sql` when the CSVs change, and the migrations were applied to
+   the cloud project `rfemgzedvjpwaeivfjhn` (33 drugs / 24 interactions / 19
+   risk rules verified live).
+7. **Applied migrations via the Management API** (`supabase/scripts/apply-sql.ps1`)
+   because the build network blocks outbound Postgres ports (5432/6543) while
+   HTTPS works. The CLI's `supabase_migrations.schema_migrations` table is
+   maintained by hand so `supabase migration list`/`db push` stay consistent.
+
+---
+
+> The rest of this document is the **historical record** of the archived
+> microservice stack (kept as evidence of the original approach and its
+> rationale — the code itself lives in `_archive/`).
+
+## Phase 0 — as-built (archived 2026-08-20)
 
 - Monorepo scaffold: `services/` (7 FastAPI apps + placeholder for the gateway),
   `shared/rxguard_shared` package, `data/` seed datasets, `infra/` compose files,
@@ -52,7 +102,7 @@
 - `infra/docker-compose.yml` currently brings up only Postgres + Redis; services
   are added per phase.
 
-## Phase 1 — as-built
+## Phase 1 — as-built (archived 2026-08-20)
 
 The core vertical slice: create a patient → write a multi-drug prescription →
 run the rule-based interaction check → view results.
@@ -151,6 +201,19 @@ Recorded here with rationale, per spec §14. New entries are added each phase.
    engine URL (configparser interpolation) and pre-creates the service schema
    before migrating, because Alembic writes its `alembic_version` table *before*
    any migration (and thus before the schema from migration `0001`) exists.
+9. **Whole stack pivot to Supabase + Next.js + Groq** (supersedes items above —
+   see the pivot section at the top of this document).
+10. **Berkeley Mono → JetBrains Mono**: the design system called for Berkeley
+    Mono, a paid font. JetBrains Mono is the free, metrically comparable
+    substitute (documented per the design's "font substitution" workflow).
+11. **`supabase db push` could not connect** from this network (outbound
+    Postgres ports blocked); migrations are applied through the Supabase
+    Management API (`POST /v1/projects/{ref}/database/query`) and recorded in
+    `supabase_migrations.schema_migrations` so the CLI state stays truthful.
+12. **Dropped scikit-learn classifier**: the evaluation design in `prompt.md`
+    compares the AI engine against a manual/reference-based engine, not against
+    a trained classifier; removing it keeps the comparison to the research
+    question and avoids a second model whose data needs are unmet at this scale.
 
 ## Design decisions worth defending
 

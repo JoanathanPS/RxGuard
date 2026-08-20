@@ -28,7 +28,7 @@ These were decided up front — don't re-litigate them, just implement:
 
 - **Full architecture as diagrammed** in the Review 2 deck (microservices, API gateway, Docker/Kubernetes, Prometheus/Grafana/ELK, RBAC) — not a simplified monolith. Because this is a lot of surface area for one build, it's sequenced into phases (Section 9); early phases deliberately run the "microservices" as separate FastAPI apps in Docker Compose before Kubernetes enters the picture.
 - **Drug/interaction data:** free public sources — **RxNorm API** (drug standardization, autocomplete) and **OpenFDA** (drug label / interaction / adverse-event data) — no API key required for either. Since public API coverage of DDI pairs is inconsistent and a live demo/grading session can't depend on network flakiness, back both with a **local curated dataset** (`data/interactions_seed.csv` or `.json`) of well-known interactions (seed it with the deck's own examples: Warfarin+Aspirin → high-severity bleeding risk, Amoxicillin+Paracetamol → safe/no significant interaction, and ~15-20 more well-documented pairs spanning severity levels). The local dataset also doubles as: (a) the fallback when RxNorm/OpenFDA are unreachable, (b) the ground truth for the benchmark/comparative-evaluation suite, and (c) the entire data source for the Manual-Simulated Checking Engine (see Module 2).
-- **AI provider: Groq API** (fast LLM inference, OpenAI-compatible SDK/endpoint) — used for the explanation generator and to assist severity reasoning. Requires the user's own `GROQ_API_KEY`; make the model configurable via `GROQ_MODEL` env var (default to a current Groq-hosted Llama model — check Groq's model list at build time since hosted models rotate, `llama-3.3-70b-versatile` was current as of this spec).
+- **AI provider: Groq API** (fast LLM inference, OpenAI-compatible SDK/endpoint) — used for the explanation generator and to assist severity reasoning. Requires the user's own `GROQ_API_KEY`; make the model configurable via `GROQ_MODEL` env var. Default to `openai/gpt-oss-120b` — Groq's own open-weight model built for agentic tool-use, and the migration target Groq points to now that `llama-3.3-70b-versatile` has been shut down (Aug 16, 2026). Re-check Groq's model/deprecation list at build time regardless, since hosted models rotate: https://console.groq.com/docs/models and https://console.groq.com/docs/deprecations.
 - **Mobile app is out of scope** — it's explicitly listed as Future Scope in the deck itself (slide 13). Build the web app only; keep the API layer clean enough that a mobile client could consume it later.
 
 ---
@@ -250,7 +250,7 @@ rxguard/
 ```
 # AI
 GROQ_API_KEY=
-GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_MODEL=openai/gpt-oss-120b
 
 # External data (no key required)
 RXNORM_BASE_URL=https://rxnav.nlm.nih.gov/REST

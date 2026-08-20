@@ -139,9 +139,10 @@ Deploy target: Supabase-hosted Postgres/Auth/Edge Functions (free tier is enough
   live e2e on warfarin+aspirin+metformin in a pregnant CKD patient produced
   warfarin→avoid (pregnancy), aspirin→caution, metformin→caution, warfarin+aspirin
   →high; results + summary + audit rows persisted.
-- **Phase 4 — Comparative evaluation** 🔄 — manual baseline ✅ (1.0/1.0/1.0 on 6
-  cases); AI leg completes against the Groq rolling quota
-  (`supabase/scripts/eval-ai-loop.mjs`).
+- **Phase 4 — Comparative evaluation** ✅ — manual baseline 1.0/1.0/1.0; AI leg
+  0.857/0.833/1.0/0.909 (acc/prec/recall/F1, FPR 0.5, FNR 0) aggregated across
+  incremental runs (`docs/eval-ai-results.json`); full comparison visible in
+  the eval dashboard.
 - **Phase 5 — Audit, RBAC, artifacts** 🔄 — RLS verified per role, audit rows
   live, `architecture.md` finalized; screenshots pending.
 
@@ -160,5 +161,5 @@ Deploy target: Supabase-hosted Postgres/Auth/Edge Functions (free tier is enough
 
 ## 10. Open items
 
-- Groq free-tier TPD (200k, rolling) — the AI eval leg completes incrementally via `eval-ai-loop.mjs`; a full comparison table is captured once all 6 cases land.
-- Review-report screenshots (login / interview card / assessment view / eval dashboard) — capture in a browser at `http://localhost:3000`.
+- Review-report screenshots (login ✓ captured; interview card / assessment view
+  / eval dashboard) — capture in a browser at `http://localhost:3000`.

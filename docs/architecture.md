@@ -224,13 +224,22 @@ AI-vs-manual baseline on seeded benchmark cases (Module 4 of the deck).
   interaction `.or()` double-wrap above, and (2) `warfarin+amiodarone` was
   missing from `interactions_seed` and the case-1 expected verdicts omitted the
   aspirin caution — both corrected in the database.
-- **Result (AI leg)**: blocked by the Groq free-tier quota on the first full
-  attempt (see *Blocked*). The harness was hardened in response: the route now
-  treats each case independently — a failed case is reported in the table with
-  its error and excluded from the aggregate metrics, and the AI fixture patient
-  is deleted after each case (whether it succeeded or not) so re-runs do not
-  accumulate rows. `supabase/scripts/eval-ai-loop.mjs` retries the run against
-  the rolling quota until all cases complete.
+- **Result (AI leg, 2026-08-21)**: completed across incremental runs against the
+  Groq rolling quota (`supabase/scripts/eval-ai-loop.mjs`):
+  **accuracy 0.857 / precision 0.833 / recall 1.0 / F1 0.909 / FPR 0.5 / FNR 0**,
+  ~8.7 s per case vs ~0.5 ms for the manual baseline. The AI never missed an
+  avoid/caution (FNR 0) but over-flagged: it marked aspirin *caution* for a
+  clean 29-year-old (case 5) and amiodarone *caution* for case 4 where the
+  benchmark expects only warfarin caution. This is exactly the thesis result
+  the project was built to show — the reference engine is precise and
+  deterministic; the LLM engine is conservative and adds patient-specific
+  rationale (and 17,000× latency). Per-case verdicts and the aggregate metrics
+  are persisted in `docs/eval-ai-results.json`.
+- The harness was hardened along the way: the route now treats each case
+  independently (a failed case is reported with its error and excluded from the
+  aggregates, and the AI fixture patient is deleted after each case), and it
+  accepts `?cases=1,3` to resume partial runs without re-burning quota on
+  completed cases.
 
 ## Phase 5 — audit & RBAC verification (as-built so far)
 

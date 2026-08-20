@@ -65,8 +65,9 @@ microservice stack was **archived to `_archive/`** — see the pivot section in
   question checklist, unknown-tolerant answers, interview card UI.
 - **Phase 3** ✅ — grounded final assessment (`final-assessment`), verdicts +
   interactions persisted, assessment view UI.
-- **Phase 4** 🔄 — comparative eval: manual baseline ✅ (1.0 acc/prec/recall on 6
-  benchmark cases); AI leg ✅ pending full quota run (see eval dashboard).
+- **Phase 4** ✅ — comparative eval: manual baseline 1.0/1.0/1.0; AI engine
+  0.857/0.833/1.0/0.909 (acc/prec/recall/F1) over the 6 benchmark cases
+  (`docs/eval-ai-results.json`); full comparison in the eval dashboard.
 - **Phase 5** 🔄 — RLS verified, audit rows live, docs in progress.
 
 ## Quickstart (current stack)

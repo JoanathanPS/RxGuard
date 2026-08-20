@@ -1,0 +1,138 @@
+{
+  "engine": "ai",
+  "completed_cases": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "metrics": {
+    "accuracy": 0.8571428571428571,
+    "precision": 0.8333333333333334,
+    "recall": 1,
+    "f1": 0.9090909090909091,
+    "fpr": 0.5,
+    "fnr": 0,
+    "tp": 5,
+    "tn": 1,
+    "fp": 1,
+    "fn": 0,
+    "n": 7
+  },
+  "cases": [
+    {
+      "case_id": 1,
+      "description": "Warfarin + high-dose aspirin, elderly patient, GI bleed history, no INR available - interaction-driven caution.",
+      "drugs": [
+        "warfarin",
+        "aspirin"
+      ],
+      "expected": {
+        "aspirin": "caution",
+        "warfarin": "caution"
+      },
+      "predicted": {
+        "warfarin": "caution",
+        "aspirin": "caution"
+      },
+      "time_ms": 5361.3197,
+      "interactions": [
+        {
+          "drug_a": "warfarin",
+          "drug_b": "aspirin",
+          "severity": "high",
+          "mechanism": "both impair hemostasis (warfarin anticoagulation + aspirin platelet inhibition)",
+          "explanation": "significantly increased risk of bleeding, particularly gastrointestinal hemorrhage"
+        }
+      ]
+    },
+    {
+      "case_id": 2,
+      "description": "Metformin in CKD with eGFR < 30 - rule-driven avoid.",
+      "drugs": [
+        "metformin"
+      ],
+      "expected": {
+        "metformin": "avoid"
+      },
+      "predicted": {
+        "metformin": "avoid"
+      },
+      "time_ms": 7843.393,
+      "interactions": []
+    },
+    {
+      "case_id": 3,
+      "description": "Metformin with eGFR 30-45 - rule-driven caution + dose monitor.",
+      "drugs": [
+        "metformin"
+      ],
+      "expected": {
+        "metformin": "caution"
+      },
+      "predicted": {
+        "metformin": "caution"
+      },
+      "time_ms": 5406.3248,
+      "interactions": []
+    },
+    {
+      "case_id": 4,
+      "description": "Warfarin + amiodarone with a known moderate interaction, monitored INR 2.4.",
+      "drugs": [
+        "warfarin",
+        "amiodarone"
+      ],
+      "expected": {
+        "warfarin": "caution"
+      },
+      "predicted": {
+        "warfarin": "caution",
+        "amiodarone": "caution"
+      },
+      "time_ms": 5898.7636,
+      "interactions": [
+        {
+          "drug_a": "warfarin",
+          "drug_b": "amiodarone",
+          "severity": "moderate",
+          "mechanism": "amiodarone inhibits warfarin metabolism and displaces it from protein binding, raising INR",
+          "explanation": "patient may experience higher anticoagulation and bleeding; INR should be monitored closely after amiodarone initiation"
+        }
+      ]
+    },
+    {
+      "case_id": 5,
+      "description": "Aspirin alone, young healthy adult, no risk factors.",
+      "drugs": [
+        "aspirin"
+      ],
+      "expected": {
+        "aspirin": "safe"
+      },
+      "predicted": {
+        "aspirin": "caution"
+      },
+      "time_ms": 5274.442,
+      "interactions": []
+    },
+    {
+      "case_id": 6,
+      "description": "Warfarin with clean labs and INR in range, no interacting drugs - safe.",
+      "drugs": [
+        "warfarin"
+      ],
+      "expected": {
+        "warfarin": "safe"
+      },
+      "predicted": {
+        "warfarin": "safe"
+      },
+      "time_ms": 22666.7863,
+      "interactions": []
+    }
+  ],
+  "note": "AI metrics aggregated across incremental runs; Groq free-tier rolling TPD forced sequential execution."
+}

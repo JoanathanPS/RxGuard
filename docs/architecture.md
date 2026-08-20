@@ -224,8 +224,13 @@ AI-vs-manual baseline on seeded benchmark cases (Module 4 of the deck).
   interaction `.or()` double-wrap above, and (2) `warfarin+amiodarone` was
   missing from `interactions_seed` and the case-1 expected verdicts omitted the
   aspirin caution — both corrected in the database.
-- **AI leg**: blocked until the Groq free-tier 200k token/day quota resets
-  (see *Blocked* notes).
+- **Result (AI leg)**: blocked by the Groq free-tier quota on the first full
+  attempt (see *Blocked*). The harness was hardened in response: the route now
+  treats each case independently — a failed case is reported in the table with
+  its error and excluded from the aggregate metrics, and the AI fixture patient
+  is deleted after each case (whether it succeeded or not) so re-runs do not
+  accumulate rows. `supabase/scripts/eval-ai-loop.mjs` retries the run against
+  the rolling quota until all cases complete.
 
 ## Phase 5 — audit & RBAC verification (as-built so far)
 
@@ -235,7 +240,8 @@ AI-vs-manual baseline on seeded benchmark cases (Module 4 of the deck).
   `researcher` / `admin`.
 - **Audit**: `interview-turn` and `final-assessment` both append `audit_log`
   rows (service key; INSERT-only for normal users, SELECT for researcher/admin
-  per RLS). Empty until a live Groq-backed run completes — see *Blocked*.
+  per RLS). Verified live: two `interview.completed` + one `assessment.completed`
+  rows from the demo runs.
 
 ---
 

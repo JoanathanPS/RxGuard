@@ -34,6 +34,7 @@ interface CaseOutcome {
   expected: Record<string, string>;
   predicted: Record<string, string>;
   time_ms: number;
+  error?: string;
 }
 
 interface EvalResponse {
@@ -195,6 +196,11 @@ export function EvalDashboard() {
                       <span className="text-ink/50">{o.drugs.join(" + ")}</span>
                     </div>
                     <p className="mt-1 text-xs text-ink/50">{o.description}</p>
+                    {aiOutcome?.error && (
+                      <p className="mt-2 rounded border border-danger/40 bg-danger/5 px-2 py-1 text-xs text-danger">
+                        AI: {aiOutcome.error.slice(0, 160)}
+                      </p>
+                    )}
                     <table className="mt-3 w-full text-xs">
                       <thead>
                         <tr className="text-left text-ink/40">

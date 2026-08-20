@@ -22,6 +22,7 @@ interface CaseOutcome {
   predicted: Record<string, string>;
   time_ms: number;
   interactions: unknown[];
+  error?: string;
 }
 
 async function loadGrounding(svc: ReturnType<typeof createAdminClient>, names: string[]) {
@@ -91,6 +92,9 @@ async function runAiCase(svc: ReturnType<typeof createAdminClient>, c: Benchmark
     body: JSON.stringify({ prescription_id: rx.id }),
   });
   const text = await res.text();
+  // Clean up the fixture patient (cascades to prescription/session/responses)
+  // whether the engine call succeeded or not, so re-runs don't accumulate rows.
+  await svc.from("patients").delete().eq("id", patient.id);
   if (!res.ok) throw new Error(`final-assessment: ${res.status} ${text.slice(0, 300)}`);
   const data = JSON.parse(text);
 
@@ -144,6 +148,7 @@ export async function POST(req: Request) {
       const expected: Record<string, string> = c.expected_results?.verdicts ?? {};
       let predicted: Record<string, string> = {};
       let interactions: unknown[] = [];
+      let error: string | undefined;
       const t0 = performance.now();
 
       if (eng === "manual") {
@@ -156,9 +161,13 @@ export async function POST(req: Request) {
         predicted = Object.fromEntries(result.assessments.map((a) => [a.drug_name, a.verdict]));
         interactions = result.interactions;
       } else {
-        const ai = await runAiCase(svc, c, user.id);
-        predicted = ai.verdicts;
-        interactions = ai.interactions;
+        try {
+          const ai = await runAiCase(svc, c, user.id);
+          predicted = ai.verdicts;
+          interactions = ai.interactions;
+        } catch (e) {
+          error = e instanceof Error ? e.message : String(e);
+        }
       }
 
       const timeMs = performance.now() - t0;
@@ -171,13 +180,21 @@ export async function POST(req: Request) {
         predicted,
         time_ms: round4(timeMs),
         interactions,
+        error,
       });
     }
 
-    const expectedRows: VerdictRow[] = list.flatMap((c) =>
-      Object.entries(c.expected_results?.verdicts ?? {}).map(([drug, verdict]) => ({ caseId: c.id, drug, verdict })),
-    );
-    const predictedRows: VerdictRow[] = perCase.flatMap((o) =>
+    // Metrics cover the cases an engine actually completed; a failed case is
+    // reported in the table but excluded from the aggregate so a single
+    // provider hiccup doesn't distort the comparison.
+    const completed = perCase.filter((o) => !o.error);
+    const completedIds = new Set(completed.map((o) => o.case_id));
+    const expectedRows: VerdictRow[] = list
+      .filter((c) => completedIds.has(c.id))
+      .flatMap((c) =>
+        Object.entries(c.expected_results?.verdicts ?? {}).map(([drug, verdict]) => ({ caseId: c.id, drug, verdict })),
+      );
+    const predictedRows: VerdictRow[] = completed.flatMap((o) =>
       Object.entries(o.predicted).map(([drug, verdict]) => ({ caseId: o.case_id, drug, verdict })),
     );
     const metrics = computeMetrics(expectedRows, predictedRows);

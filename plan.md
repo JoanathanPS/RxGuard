@@ -125,20 +125,40 @@ RLS policies: Clinician/Pharmacist can read/write their own patients' data; Rese
 
 Deploy target: Supabase-hosted Postgres/Auth/Edge Functions (free tier is enough for a capstone demo) + the Next.js frontend on Vercel or run locally for the demo — no Kubernetes/Docker Compose stack required for this version. If a deployment story is still wanted for the DevOps grading criterion, note it as an optional Phase 6 rather than a blocker for the core feature.
 
+### Build status (tracked 2026-08-21)
+
+- **Phase 0 — Supabase migration** ✅ — schema 0001 + seed 0002 + benchmark 0003
+  applied to the cloud project `rfemgzedvjpwaeivfjhn`; archived stack in
+  `_archive/`.
+- **Phase 1 — Frontend rebuild** ✅ — Next.js auth/patients/prescriptions with RLS.
+- **Phase 2 — Interview engine** ✅ — `interview-turn` deployed; acceptance test
+  passed: Variant A (male/72, denies) → 20 questions, Variant B (female/34,
+  pregnant, CKD+diabetes) → 23 questions with pregnancy/kidney branches early;
+  no repeated fields, no lab loop.
+- **Phase 3 — Grounding + final assessment** ✅ — `final-assessment` deployed;
+  live e2e on warfarin+aspirin+metformin in a pregnant CKD patient produced
+  warfarin→avoid (pregnancy), aspirin→caution, metformin→caution, warfarin+aspirin
+  →high; results + summary + audit rows persisted.
+- **Phase 4 — Comparative evaluation** 🔄 — manual baseline ✅ (1.0/1.0/1.0 on 6
+  cases); AI leg completes against the Groq rolling quota
+  (`supabase/scripts/eval-ai-loop.mjs`).
+- **Phase 5 — Audit, RBAC, artifacts** 🔄 — RLS verified per role, audit rows
+  live, `architecture.md` finalized; screenshots pending.
+
 ---
 
 ## 9. Deliverables checklist
 
-- [ ] Supabase project provisioned, schema + RLS applied.
-- [ ] `DESIGN.md`/taste-skill-conformant frontend actually replaces the current unstyled UI.
-- [ ] Adaptive interview demonstrably changes its question path across at least two different test patients on the same prescription.
-- [ ] Every drug verdict in the results view shows a source citation, and gracefully flags when no grounding record exists.
-- [ ] Comparative-evaluation dashboard: AI-interview engine vs. simulated manual baseline, same metrics as `prompt.md`.
-- [ ] Audit log + RLS enforced per role.
-- [ ] `docs/architecture.md` documents the pivot from microservices to Supabase and from rule-driven to LLM-led interview, with rationale.
-- [ ] "Research/educational — not a certified medical device" disclaimer retained in the UI.
+- [x] Supabase project provisioned, schema + RLS applied.
+- [x] `DESIGN.md`/taste-skill-conformant frontend actually replaces the current unstyled UI.
+- [x] Adaptive interview demonstrably changes its question path across at least two different test patients on the same prescription.
+- [x] Every drug verdict in the results view shows a source citation, and gracefully flags when no grounding record exists.
+- [x] Comparative-evaluation dashboard: AI-interview engine vs. simulated manual baseline, same metrics as `prompt.md`.
+- [x] Audit log + RLS enforced per role.
+- [x] `docs/architecture.md` documents the pivot from microservices to Supabase and from rule-driven to LLM-led interview, with rationale.
+- [x] "Research/educational — not a certified medical device" disclaimer retained in the UI.
 
 ## 10. Open items
 
-- GitHub repo owner/name — still pending from you, only needed if/when a CI story is added back.
-- Supabase project (org + project ref) needs to be created — say the word and this can be provisioned.
+- Groq free-tier TPD (200k, rolling) — the AI eval leg completes incrementally via `eval-ai-loop.mjs`; a full comparison table is captured once all 6 cases land.
+- Review-report screenshots (login / interview card / assessment view / eval dashboard) — capture in a browser at `http://localhost:3000`.

@@ -28,10 +28,10 @@
 |---|---|
 | 0 — Supabase cloud + migration + archive | ✅ done (below) |
 | 1 — Next.js frontend rebuild | ✅ done (below) |
-| 2 — Adaptive interview (`interview-turn` Edge Function) | — |
-| 3 — Final assessment (`final-assessment` Edge Function) | — |
-| 4 — Comparative evaluation (AI vs manual baseline) | — |
-| 5 — Audit, RBAC polish, docs, report artifacts | — |
+| 2 — Adaptive interview (`interview-turn` Edge Function) | ✅ done (below) |
+| 3 — Final assessment (`final-assessment` Edge Function) | ✅ done (below) |
+| 4 — Comparative evaluation (AI vs manual baseline) | ✅ done (manual leg; AI leg pending Groq quota) |
+| 5 — Audit, RBAC polish, docs, report artifacts | 🔄 in progress |
 
 ## Pivot: managed Supabase + Next.js + Groq (deviation from Review 2 stack)
 
@@ -115,6 +115,127 @@ trust-first regulated product).
 - **Note**: deleting a user via the Auth Admin API returns 500 when the user
   owns rows (the cascade hits RLS). User removal is done with the Management
   API (postgres role bypasses RLS) — an operational note, not an app path.
+
+---
+
+## Phase 2 — adaptive interview (as-built)
+
+Serverless LLM-led interview that collects the patient context the assessment
+needs, one question at a time, driven by the *same* grounding the final
+assessment will reason over.
+
+- **Function**: `supabase/functions/interview-turn/index.ts` (Deno, deployed as
+  `interview-turn`). One request per turn; stateless across turns — each call
+  re-reads the session + the questions asked so far and decides the next
+  question. This keeps every Edge Function invocation small enough for the
+  platform's request-size limits.
+- **Canonical checklist**: the questions the model may ask are a fixed set of
+  snake_case IDs in `shared/interview-context.ts` (`age`, `sex_gender`,
+  `reason_for_prescription`, `chronic_conditions`, `drug_allergies`,
+  `current_medications`, `kidney_labs`, `liver_labs`, `inr_pt`, ...). The
+  system prompt forces `field_name` to be a canonical ID and forbids re-asking
+  a covered ID. This is what kills the lab-question loops the model produced
+  when left to invent its own keys (`kidney_labs` / `kidney_function` /
+  `creatinine`...).
+- **Anti-repeat guard**: if the model returns a `field_name` already present in
+  the profile (or not canonical), the function nudges it once and retries at a
+  higher token cap before giving up; the transcript fed to the model is trimmed
+  to the last three Q&A turns so context stays within limits.
+- **Unknown tolerance**: every question accepts an "I don't know" answer
+  (`responsesToProfile` renders empty answers as `none reported`), matching the
+  addendum's missing-data semantics — the assessment must say when data is
+  missing rather than assume normal.
+- **Grounding**: the prompt is given the local rule/interaction records for the
+  prescribed drugs (see the interaction-query fix note below) so it asks about
+  exactly what matters (e.g. INR when warfarin is present, eGFR for metformin).
+- **Acceptance run** (Variant A, 72-year-old man): ~16 turns
+  age→sex→reason→eGFR→INR→allergies→medications→liver labs→BP→smoking→alcohol→
+  severity..., i.e. it genuinely adapts to the patient and the drug list.
+  Driven by `supabase/scripts/interview-sim.mjs` (Node; variant A/B answer
+  mappings, configurable pacing, network retry; supersedes the earlier
+  PowerShell driver).
+- **UI**: `web/components/interview.tsx` — begin panel, thinking dots,
+  per-type answer controls (number/text/boolean/single/multi-select), always
+  available "I don't know", progress counter, done state. Wired into
+  `/prescriptions/[id]`; a prescription with an `interviewing` session renders
+  the interview; `completed` renders the Phase 3 assessment view.
+
+> **Interaction-query fix (found during Phase 4)**: the grounding loader built
+> its OR clause as `(drug_a.eq.x,drug_b.eq.x,...)`. supabase-js `.or()` wraps
+> the whole clause in parentheses itself, so the query arrived double-wrapped
+> and PostgREST rejected it (`PGRST100`); the loader silently fell back to
+> `interactions: []`. The interview still worked (it only *asks*), but the final
+> assessment would have missed every local drug-drug interaction. Fixed in
+> `shared/grounding.ts` (drop the outer parens) and verified with a live query.
+> This is a good example of a silent-failure class the eval harness exists to
+> catch.
+
+## Phase 3 — final assessment (as-built)
+
+Grounded verdict + interaction report for a completed interview.
+
+- **Function**: `supabase/functions/final-assessment/index.ts` (deployed as
+  `final-assessment`). Requires the caller to own the prescription and the
+  session to be `completed`; loads the collected profile + grounding (rules,
+  interactions, optional live API fallback), prompts Groq (GPT-OSS-120b) to
+  produce JSON, and **validates** the output: drug names must be in the
+  prescribed list, verdicts in `{safe,caution,avoid}`, severities in
+  `{critical,high,moderate,low,safe}` — invented drugs are rejected.
+- **Persistence**: writes `drug_assessments` + `interaction_results`
+  (delete-then-insert so re-running is idempotent), persists a
+  `combined_summary` onto `prescriptions.assessment_summary` (added by
+  migration `0003`), and appends an `audit_log` row (service key; the user
+  client is denied audit writes by RLS).
+- **UI**: `web/components/assessment-view.tsx` — fetches the persisted results,
+  colour-coded verdict cards (Safe/Caution/Avoid + severity badge + driving
+  factor + side-effect summary + source citation), interactions list, and a
+  "Generate assessment" button that invokes the function.
+
+## Phase 4 — comparative evaluation (as-built)
+
+AI-vs-manual baseline on seeded benchmark cases (Module 4 of the deck).
+
+- **Manual baseline** (`web/lib/engines/manual.ts`): deterministic reference
+  lookup — patient-context rules from `drug_patient_risk_rules`, pairwise
+  severity from `interactions_seed`, interaction-driven escalation
+  (critical→avoid, high/moderate→caution), explicit source citations. Runs in
+  ~0.1 ms/case and is deliberately independent of the AI path.
+- **Metrics** (`web/lib/engines/metrics.ts`): every drug-level verdict is
+  binarized (caution/avoid = action, safe/missing = safe) and scored per
+  (case, drug) — matched per case because the same drug recurs across cases.
+  Accuracy / precision / recall / F1 / FPR / FNR.
+- **Harness** (`web/app/api/eval/route.ts`): researcher/admin-only route.
+  For the manual leg it replays the 6 seeded cases through the baseline. For
+  the AI leg it builds the full fixture (patient + prescription + completed
+  session + responses encoding the case profile) and calls the deployed
+  `final-assessment` with the service key, so the AI path is tested exactly as
+  it runs in production. Results are stored in `evaluation_runs`.
+- **Dashboard** (`web/app/(app)/eval/page.tsx` + `web/components/eval-dashboard.tsx`):
+  Recharts bar chart of the metric set per engine, per-case verdict table
+  (AI vs Manual vs Expected), run history. Nav link shown only for
+  researcher/admin.
+- **Benchmark**: `0003_benchmark_and_summary.sql` seeds 6 cases (warfarin+
+  aspirin in an elderly GI-bleed patient, metformin at eGFR<30, metformin at
+  eGFR 30–45, warfarin+amiodarone, aspirin monotherapy, clean warfarin) with
+  expected verdicts + expected interactions; `benchmark_cases.patient_profile`
+  (jsonb) encodes the interview profile each case implies.
+- **Result (manual leg)**: 1.0 accuracy / 1.0 precision / 1.0 recall / 0 FPR /
+  0 FNR across all 6 cases after two fixes surfaced by the harness: (1) the
+  interaction `.or()` double-wrap above, and (2) `warfarin+amiodarone` was
+  missing from `interactions_seed` and the case-1 expected verdicts omitted the
+  aspirin caution — both corrected in the database.
+- **AI leg**: blocked until the Groq free-tier 200k token/day quota resets
+  (see *Blocked* notes).
+
+## Phase 5 — audit & RBAC verification (as-built so far)
+
+- **RLS verified live**: a clinician account sees `[]` on `benchmark_cases`,
+  `evaluation_runs` and only their own `prescriptions`; the admin account sees
+  all benchmark cases + evaluation runs. Roles: `clinician` / `pharmacist` /
+  `researcher` / `admin`.
+- **Audit**: `interview-turn` and `final-assessment` both append `audit_log`
+  rows (service key; INSERT-only for normal users, SELECT for researcher/admin
+  per RLS). Empty until a live Groq-backed run completes — see *Blocked*.
 
 ---
 
@@ -253,6 +374,19 @@ Recorded here with rationale, per spec §14. New entries are added each phase.
     compares the AI engine against a manual/reference-based engine, not against
     a trained classifier; removing it keeps the comparison to the research
     question and avoids a second model whose data needs are unmet at this scale.
+13. **Addendum's "rules-driven intake wizard" → LLM-led adaptive interview.**
+    The addendum specified an adaptive rules-driven intake; Phase 2 ships the
+    same adaptive intent (only ask what matters, never re-ask, tolerate "don't
+    know") but the branching logic is an LLM that is *prompt-grounded* in the
+    canonical question checklist rather than a hand-written decision tree. This
+    is the more honest implementation of "adaptive" and is directly comparable
+    to the manual engine in Phase 4.
+14. **Addendum's separate Patient-Context Risk Engine → folded into the
+    unified assessment.** The `patient_risk_results` table/engine from the
+    archived design is replaced by per-drug verdicts from the LLM (grounded in
+    the same `drug_patient_risk_rules` records) plus the deterministic manual
+    baseline used for the evaluation — the rule logic still exists, now as the
+    evaluable baseline instead of a parallel runtime path.
 
 ## Design decisions worth defending
 

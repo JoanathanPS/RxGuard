@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-export function Shell({ email }: { email: string }) {
+export function Shell({ email, role }: { email: string; role?: string | null }) {
   const router = useRouter();
   const supabase = createClient();
 
@@ -27,6 +27,11 @@ export function Shell({ email }: { email: string }) {
           <Link href="/patients" className="hover:text-accent">
             Patients
           </Link>
+          {role === "researcher" || role === "admin" ? (
+            <Link href="/eval" className="hover:text-accent">
+              Evaluation
+            </Link>
+          ) : null}
           <span className="text-ink/50">{email}</span>
           <button
             onClick={signOut}

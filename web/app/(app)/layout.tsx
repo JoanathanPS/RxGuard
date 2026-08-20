@@ -21,7 +21,7 @@ export default async function AppLayout({
 
   return (
     <>
-      <Shell email={profile?.email ?? user!.email ?? "user"} />
+      <Shell email={profile?.email ?? user!.email ?? "user"} role={profile?.role} />
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
         {children}
       </main>

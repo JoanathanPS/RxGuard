@@ -14,6 +14,8 @@ interface DrugRow {
   rxcui: string | null;
   dosage: string;
   route: string;
+  _confidence?: number;
+  _unmatched?: boolean;
 }
 
 export function PrescriptionForm({ patientId }: { patientId: string }) {
@@ -41,6 +43,76 @@ export function PrescriptionForm({ patientId }: { patientId: string }) {
 
   function removeRow(key: number) {
     setRows((rs) => rs.filter((r) => r.key !== key));
+  }
+
+  const [parsingImage, setParsingImage] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setImageError(null);
+    setParsingImage(true);
+
+    try {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64String = reader.result as string;
+        
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error("Not authenticated");
+
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/parse-prescription-image`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ image: base64String }),
+          }
+        );
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "Failed to parse image");
+        }
+
+        const data = await res.json();
+        const extracted = data.drugs || [];
+        
+        if (extracted.length === 0) {
+          throw new Error("No drugs found in image");
+        }
+
+        const newRows = extracted.map((d: any, i: number) => ({
+          key: Date.now() + i,
+          name: d.drug_name,
+          rxcui: d.rxcui,
+          dosage: d.dosage,
+          route: PRESCRIPTION_ROUTES.includes(d.route) ? d.route : "oral",
+          _confidence: d.confidence,
+          _unmatched: d.unmatched
+        }));
+
+        setRows((current) => {
+          // If there's only one empty row, replace it. Otherwise append.
+          if (current.length === 1 && !current[0].name) {
+            return newRows;
+          }
+          return [...current, ...newRows];
+        });
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      setImageError(err.message);
+    } finally {
+      setParsingImage(false);
+      // reset file input
+      e.target.value = '';
+    }
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -142,27 +214,60 @@ export function PrescriptionForm({ patientId }: { patientId: string }) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-6">
+      
+      {/* Upload Block */}
+      <div className="rounded border border-dashed border-ink/40 p-6 flex flex-col items-center justify-center text-center bg-card/50">
+        <p className="text-sm font-medium mb-2">Upload prescription photo</p>
+        <p className="text-xs text-ink/60 mb-4 max-w-md">
+          Automatically extract drugs from a physical prescription. You will review the list before saving.
+        </p>
+        <div className="relative">
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleImageUpload}
+            disabled={parsingImage}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+          />
+          <Button type="button" variant="ghost" disabled={parsingImage}>
+            {parsingImage ? "Analyzing..." : "Choose Image"}
+          </Button>
+        </div>
+        {imageError && (
+          <p className="mt-3 text-xs text-danger bg-danger/10 px-2 py-1 rounded">{imageError}</p>
+        )}
+      </div>
+
       <div className="space-y-3">
-        {rows.map((row, index) => (
-          <div
-            key={row.key}
-            className="rounded border border-ink/20 p-4"
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-ink/60">
-                Drug {index + 1}
-              </span>
-              {rows.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => removeRow(row.key)}
-                  className="text-xs text-danger underline underline-offset-4"
-                >
-                  Remove
-                </button>
-              )}
-            </div>
-            <div className="grid gap-4 md:grid-cols-3">
+        {rows.map((row, index) => {
+          const needsReview = row._unmatched || (row._confidence !== undefined && row._confidence < 0.7);
+          return (
+            <div
+              key={row.key}
+              className={`rounded border p-4 ${needsReview ? "border-amber-500 bg-amber-500/5" : "border-ink/20"}`}
+            >
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-ink/60">
+                    Drug {index + 1}
+                  </span>
+                  {needsReview && (
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">
+                      Needs Review
+                    </span>
+                  )}
+                </div>
+                {rows.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeRow(row.key)}
+                    className="text-xs text-danger underline underline-offset-4"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
               <div className="md:col-span-1">
                 <Field label="Drug">
                   <DrugPicker
@@ -202,9 +307,10 @@ export function PrescriptionForm({ patientId }: { patientId: string }) {
                   ))}
                 </Select>
               </Field>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <button

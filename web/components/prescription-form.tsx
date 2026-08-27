@@ -80,6 +80,22 @@ export function PrescriptionForm({ patientId }: { patientId: string }) {
           .map((d) => [d.drug_name, d.rxcui] as const)
           .filter(([, r]) => r != null),
       );
+      
+      // For any drugs still missing an RxCUI, search the live RxNorm API
+      for (const name of missing) {
+        if (!resolved[name]) {
+          try {
+            const res = await fetch(`https://rxnav.nlm.nih.gov/REST/rxcui.json?name=${encodeURIComponent(name)}`);
+            if (res.ok) {
+              const body = await res.json();
+              const rxcui = body?.idGroup?.rxnormId?.[0];
+              if (rxcui) resolved[name] = rxcui;
+            }
+          } catch (e) {
+            console.error("Failed to resolve RxCUI for", name, e);
+          }
+        }
+      }
     }
 
     const { data: rx, error: rxError } = await supabase

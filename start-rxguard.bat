@@ -27,15 +27,15 @@ if not exist "web\.env.local" (
     echo.
 )
 if not exist ".env" (
-    echo [WARNING] .env is missing at the repo root (Management API token for
-    echo            supabase scripts). The app still runs without it.
+    echo [WARNING] .env is missing at the repo root ^(Management API token for
+    echo            supabase scripts^). The app still runs without it.
     echo.
 )
 
 REM ---- 3. Dependencies --------------------------------------------------------
 echo [1/3] Checking web dependencies...
 if not exist "web\node_modules" (
-    echo        Installing web dependencies (first run only)...
+    echo        Installing web dependencies ^(first run only^)...
     pushd web
     call npm install
     popd

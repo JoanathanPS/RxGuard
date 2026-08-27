@@ -71,6 +71,7 @@ export function Interview({ prescriptionId, patientName, drugs, sessionId }: Pro
       setThinking(true);
       setError(null);
       const sid = question.session_id;
+      setQuestion(null);
       try {
         const { error: insErr } = await supabase
           .from("interview_responses")
@@ -150,7 +151,7 @@ export function Interview({ prescriptionId, patientName, drugs, sessionId }: Pro
             ))}
           </div>
           <p className="text-sm text-ink/50">
-            {question ? "Thinking about your answer…" : "Preparing your first question…"}
+            {question ? "Thinking about your answer…" : "Preparing your question…"}
           </p>
         </motion.div>
       )}

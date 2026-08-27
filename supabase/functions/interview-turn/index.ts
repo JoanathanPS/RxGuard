@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
     let step = "load-rx";
     const { data: rx, error: rxErr } = await user
       .from("prescriptions")
-      .select("id, status, prescription_items(drug_name, rxcui, dosage, route)")
+      .select("id, status, patients(age, gender, weight_kg, height_cm, pregnant, breastfeeding), prescription_items(drug_name, rxcui, dosage, route)")
       .eq("id", prescriptionId)
       .single();
     if (rxErr || !rx) return json({ error: "forbidden" }, 403);
@@ -117,6 +117,18 @@ Deno.serve(async (req) => {
 
     step = "build-messages";
     const { profile, transcript } = responsesToProfile(responses ?? []);
+    
+    // Seed profile with known patient demographics so the model doesn't ask for them
+    const p = rx.patients as Record<string, unknown> | null;
+    if (p) {
+      if (p.age != null) profile.age = p.age;
+      if (p.gender != null) profile.sex_gender = p.gender;
+      if (p.weight_kg != null) profile.weight = p.weight_kg;
+      if (p.height_cm != null) profile.height = p.height_cm;
+      if (p.pregnant != null) profile.pregnancy = p.pregnant;
+      if (p.breastfeeding != null) profile.breastfeeding = p.breastfeeding;
+    }
+
     const drugs = rx.prescription_items as Array<{
       drug_name: string;
       rxcui: string | null;

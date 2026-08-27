@@ -78,7 +78,7 @@ export function EvalDashboard() {
     setRunning(true);
     setError(null);
     try {
-      const res = await fetch("/api/eval");
+      const res = await fetch("/api/eval", { method: "POST" });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
         throw new Error(body?.error ?? `HTTP ${res.status}`);

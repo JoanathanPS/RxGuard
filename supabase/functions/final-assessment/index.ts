@@ -72,7 +72,12 @@ function buildAssessmentMessages(params: {
 
   const system = `You are the final safety reviewer for RxGuard, an AI-assisted drug-safety capstone (research/educational). A patient's interview is complete and you must produce the FINAL assessment for each prescribed drug plus the cross-drug interaction list.
 
-Grounding is the ONLY source of drug facts. You must attach a source to every claim, phrased like "per drug_patient_risk_rules" or "per interactions_seed". If no local record matches a drug or pair, mark the claim as "no local record - unverified, confirm with a pharmacist" and still give a verdict based on the patient profile, flagged as unverified.
+Grounding is the ONLY source of drug facts. You must attach a source to every claim. Do not use raw database table names. Instead, use professional citations:
+- For "drug_patient_risk_rules", cite "RxGuard Clinical Rules".
+- For "interactions_seed", cite "RxGuard Interaction Database".
+- For "drug_mapping", cite "RxGuard Drug Database".
+- For live RxNorm data, cite "Live RxNorm Database".
+If no local record matches a drug or pair, mark the claim as "Unverified - confirm with a pharmacist" and still give a verdict based on the patient profile.
 
 VERDICTS: "safe" (no material risk), "caution" (monitor / dose-adjust / pharmacist review), "avoid" (contraindicated or serious risk). Base each verdict on the patient's distilled profile matched against the rules.
 
@@ -130,7 +135,7 @@ Deno.serve(async (req) => {
 
     const { data: rx, error: rxErr } = await user
       .from("prescriptions")
-      .select("id, prescription_items(drug_name, rxcui, dosage, route)")
+      .select("id, patients(age, gender, weight_kg, height_cm, pregnant, breastfeeding), prescription_items(drug_name, rxcui, dosage, route)")
       .eq("id", prescriptionId)
       .single();
     if (rxErr || !rx) return json({ error: "forbidden" }, 403);
@@ -159,6 +164,17 @@ Deno.serve(async (req) => {
       .eq("session_id", session.id)
       .order("answered_at", { ascending: true });
     const { profile } = responsesToProfile(responses ?? []);
+    
+    // Seed profile with known patient demographics
+    const p = rx.patients as Record<string, unknown> | null;
+    if (p) {
+      if (p.age != null) profile.age = p.age;
+      if (p.gender != null) profile.sex_gender = p.gender;
+      if (p.weight_kg != null) profile.weight = p.weight_kg;
+      if (p.height_cm != null) profile.height = p.height_cm;
+      if (p.pregnant != null) profile.pregnancy = p.pregnant;
+      if (p.breastfeeding != null) profile.breastfeeding = p.breastfeeding;
+    }
 
     const grounding = await loadGrounding(user, drugs, { live: true });
     const groundingText = formatGroundingText(grounding);
